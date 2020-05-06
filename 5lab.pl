@@ -1,7 +1,7 @@
-initial_state([0,0,0,0,0,0,0]-2-6).
-final_state([1,1,1,1,1,1,1]-_-_).
+initial_state([0,0,0,0,0,0,0]-2-6-[]).
+final_state([1,1,1,1,1,1,1]-_-_-_).
 
-next_states([K1, K2, K3, S1, S2, S3, B],[NK1, NK2, NK3, NS1, NS2, NS3, NB],G):-
+next_states([K1, K2, K3, S1, S2, S3, B],[NK1, NK2, NK3, NS1, NS2, NS3, NB],G):- %generating new states
     state([K1, K2, K3, S1, S2, S3, B],[NK1, NK2, NK3, NS1, NS2, NS3, NB],G).
 
 state([0, K2, K3, 0, S2, S3, 0],[1, K2, K3, 1, S2, S3, 1], G):- %1 pair
@@ -85,11 +85,7 @@ state([1, 0, 0, 1, S2, S3, 0],[1, 1, 1, 1, S2, S3, 1], G):- G is 2.
 state([K1, 1, 1, 1, 0, 0, 1],[K1, 0, 0, 1, 0, 0, 0], G):- G is 2.%2 knights (2, 3)
 state([K1, 0, 0, 0, 1, 1, 0],[K1, 1, 1, 0, 1, 1, 1], G):- G is 2.
 
-check_for_me(X):-
-    findall(A-F-H-G, (next_states(X, A, G),h(A,H),F is G + H), List),
-    write(List).
-
-h([K1, K2, K3, S1, S2, S3, _],H):-
+h([K1, K2, K3, S1, S2, S3, _],H):- %heuristic - quantity of people on the left side
     count(K1, K1H),
     count(K2, K2H),
     count(K3, K3H),
@@ -98,12 +94,12 @@ h([K1, K2, K3, S1, S2, S3, _],H):-
     count(S3, S3H),
     H is K1H + K2H + K3H + S1H + S2H + S3H.
 
-membering(_,[]).
+membering(_,[]). %helper realization of member()
 membering(State, [Closed|T]):-
     not(equal(State,Closed)),
     membering(State, T).
 
-equal([K1, K2, K3, S1, S2, S3, B]-_-_,[NK1, NK2, NK3, NS1, NS2, NS3, NB]-_-_):-
+equal([K1, K2, K3, S1, S2, S3, B]-_-_-_,[NK1, NK2, NK3, NS1, NS2, NS3, NB]-_-_-_):-
     K1 = NK1,
     K2 = NK2,
     K3 = NK3,
@@ -119,67 +115,45 @@ count(X,0):-
 main():-
     initial_state(X),
     append_cor([],X,Opened),
-    a_star([],Opened,Path),
-    writeln(Path).
-
-run_check():-
-    check_tmp([],[[1,1,1,1,1,1,1]-1-3,[2,2,2,2,2,2,2]-2-2,[3,3,3,3,3,3,3]-3-4,[4,4,4,4,4,4,4]-4-1,[5,5,5,5,5,5,5]-5-3],X),
-    writeln(X).
-
-check_tmp(_,[],[]).
-check_tmp(Closed, Opened, Path):-
-    min_f(Opened, Current),
-    delete(Opened,Current,NewOpened),
-    append_cor(Closed, Current, NewClosed),
-    %expand_opened(Current,NextStates,Opened,UpdNewOpened),
-    check_tmp(NewClosed,NewOpened,Path1),
-    append_cor(Path1, Current, Path).
+    a_star([],Opened).
 
 append_cor(List,State,L):- %helper for correct append of states
     append(List,[State],L).
 
-a_star(_,Opened,Path):-
-    min_f(Opened, Current),
-    final_state(Current),
-    append_cor([],Current,Path),
-    writeln('found').
-a_star(Closed,Opened,Path):-
-    min_f(Opened, Current-CG-CF),
-    writeln(Current),
-    delete(Opened, Current-CG-CF, NewOpened),
-    append_cor(Closed, Current-CG-CF, NewClosed),
-    findall(A-G1-F1,(next_states(Current,A,G1), h(A,H), F1 is G1 + H,
-                     membering(A-G1-F1,NewClosed)),
+a_star(_,Opened):- %A* final state
+    min_f(Opened, Current-CG-CF-CHistory),
+    final_state(Current-CG-CF-CHistory),
+    append_cor(CHistory,Current-CG-CF,NewHistory),
+    writeln('found'),
+    writeln(NewHistory),
+    writeln('end').
+a_star(Closed,Opened):- %A*
+    min_f(Opened, Current-CG-CF-CHistory),%getting state with minimal f
+    delete(Opened, Current-CG-CF-CHistory, NewOpened),
+    append_cor(Closed, Current-CG-CF-CHistory, NewClosed),
+    findall(A-G1-F1-History1,(next_states(Current,A,G1), h(A,H), F1 is G1 + H,%generating new states and history
+                     membering(A-G1-F1-History1,NewClosed), append_cor(CHistory, Current-CG-CF, History1)),
                      NextStates),
-    %writeln(NextStates),
-    expand_opened(Current-CG-CF,NextStates,NewOpened,UpdNewOpened),
-    a_star(NewClosed,UpdNewOpened,Path1),
-    append_cor(Path1, Current-CG-CF, Path).
+    expand_opened(Current-CG-CF-CHistory,NextStates,NewOpened,UpdNewOpened),%addition of new states
+    a_star(NewClosed,UpdNewOpened).
 
 expand_opened(_,[],Opened,Opened).
-expand_opened(Current-GC-FC,[State-G-F|Tail], Opened, Res):-
-    membering(State-G-F, Opened),
-    expand_opened(Current-GC-FC,Tail,Opened,Res1),
-    append_cor(Res1, State-G-F,Res).
-expand_opened(Current-GC-FC,[State-G-F|Tail], Opened, Res):-
-    not(membering(State-G-F, Opened)),
-    %member(State-G-F, Opened),
-    %GC < G,
-    expand_opened(Current-GC-FC,Tail,Opened,Res).
+expand_opened(Current-GC-FC-CHistory,[State-G-F-History|Tail], Opened, Res):-
+    membering(State-G-F-History, Opened),
+    expand_opened(Current-GC-FC-CHistory,Tail,Opened,Res1),
+    append_cor(Res1, State-G-F-History,Res).
+expand_opened(Current-GC-FC-CHistory,[State-G-F-History|Tail], Opened, Res):-
+    not(membering(State-G-F-History, Opened)),
+    expand_opened(Current-GC-FC-CHistory,Tail,Opened,Res).
 
 
-min_f([A],A).
-min_f([State-F|Tail],MinState):-
-    min_f(Tail,A-AF),
-    min_state(State-F, A-AF, MinState).
+min_f([A],A). %getting state with minimal
+min_f([State-G-F-His|Tail],MinState):-
+    min_f(Tail,A-AG-AF-AH),
+    min_state(State-G-F-His, A-AG-AF-AH, MinState).
 
-min_state(A-AF, _-BF, A-AF):-
+min_state(A-AG-AF-AH, _-_-BF-_, A-AG-AF-AH):-
     AF < BF.
-min_state(_-AF, B-BF, B-BF):-
+min_state(_-_-AF-_, B-BG-BF-BH, B-BG-BF-BH):-
     AF >= BF.
-
-del(Y, [Y], []).
-del(X, [X|Tail],Tail).
-del(X, [Y|Tail],[Y|Tail1]):-
-    del(X, Tail, Tail1).
 
